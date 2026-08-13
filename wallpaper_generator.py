@@ -13,6 +13,8 @@ Requires: numpy, Pillow
     pip install numpy pillow
 """
 
+from random import getrandbits
+
 import numpy as np
 from PIL import Image, ImageDraw
 import spectra
@@ -25,7 +27,8 @@ import opensimplex
 WIDTH, HEIGHT = 2560, 1440
 
 # --- Background gradient colors (RGB 0-255) ---
-SKY_BOTTOM_COLOR = spectra.html("#FF5A78").to("lch")
+SKY_BOTTOM_COLOR = spectra.html("#FF0000").to("lch")
+SKY_MID_COLOR = spectra.html("#FF5A78").to("lch")
 SKY_TOP_COLOR = spectra.html("#FFDC5A").to("lch")
 
 # --- Mountain layer colors ---
@@ -33,18 +36,17 @@ SKY_TOP_COLOR = spectra.html("#FFDC5A").to("lch")
 # the frontmost (lowest, largest) mountain uses MOUNTAIN_COLOR_NEAR.
 # Every layer in between is linearly interpolated, so the mountains get
 # progressively darker as they get lower/closer to the viewer.
-MOUNTAIN_COLOR_FAR = spectra.html("#6E82C8").to("lch")
-MOUNTAIN_COLOR_NEAR = spectra.html("#0A0F2D").to("lch")
+MOUNTAIN_COLOR_FAR = spectra.html("#005d98").to("lch")
+MOUNTAIN_COLOR_NEAR = spectra.html("#01225e").to("lch")
 
 # --- Mountain shape / layout ---
 NUM_MOUNTAINS = 4          # how many mountain layers to stack
-SEED = 42                  # change for a totally different layout
 
 # Each mountain's silhouette is built from fractal ("fBm") noise.
-NOISE_OCTAVES = 6          # more octaves = more fine detail/roughness
+NOISE_OCTAVES = 10          # more octaves = more fine detail/roughness
 NOISE_PERSISTENCE = 0.5    # how quickly amplitude shrinks per octave (0-1)
 NOISE_LACUNARITY = 2.0     # how quickly frequency grows per octave
-NOISE_BASE_FREQUENCY = 2.5 # base "zoominess" of the noise (higher = more bumps)
+NOISE_BASE_FREQUENCY = 2 # base "zoominess" of the noise (higher = more bumps)
 
 # Where the mountains sit vertically, as a fraction of image height (0=top, 1=bottom).
 # The first value is for the farthest-back mountain, the last for the closest.
@@ -52,7 +54,7 @@ MOUNTAIN_BASE_Y = np.linspace(0.55, 0.90, NUM_MOUNTAINS)
 
 # How tall each mountain's noise silhouette is, as a fraction of image height.
 # The first value is for the farthest-back mountain, the last for the closest.
-MOUNTAIN_AMPLITUDE = np.linspace(0.15, 0.30, NUM_MOUNTAINS)
+MOUNTAIN_AMPLITUDE = np.linspace(0.3, 0.2, NUM_MOUNTAINS)
 
 OUTPUT_PATH = "wallpaper.png"
 
@@ -69,7 +71,7 @@ def fractal_noise_1d(width, seed=None, octaves=5, persistence=0.5, lacunarity=2.
     """
 
     if seed is None:
-        seed = np.random.randint(2**32)
+        seed = getrandbits(16)
 
     xs = np.linspace(0, base_frequency, width, False)
     total = np.zeros(width)
@@ -93,9 +95,9 @@ def fractal_noise_1d(width, seed=None, octaves=5, persistence=0.5, lacunarity=2.
 # DRAWING
 # ============================================================
 
-def make_background(width, height, bottom_color, top_color):
+def make_background(width, height, colors):
     """Create a vertical gradient image: top_color at y=0, bottom_color at y=height."""
-    gradient = spectra.range([top_color, bottom_color], height)
+    gradient = spectra.range(colors, height)
 
     colors = 255 * np.array([[c.clamped_rgb] for c in gradient])
 
@@ -131,8 +133,15 @@ def draw_mountain(draw, width, height, base_y_frac, amplitude_frac, color, seed)
     draw.polygon(points, fill=color_tuple)
 
 
-def generate_wallpaper():
-    img = make_background(WIDTH, HEIGHT, SKY_BOTTOM_COLOR, SKY_TOP_COLOR)
+def generate_wallpaper(seed=None):
+    if seed is None:
+        seed = getrandbits(16)
+
+    img = make_background(WIDTH, HEIGHT, [
+        SKY_TOP_COLOR,
+        SKY_MID_COLOR,
+        SKY_BOTTOM_COLOR,
+    ])
     draw = ImageDraw.Draw(img)
 
     for i in range(NUM_MOUNTAINS):
@@ -145,10 +154,10 @@ def generate_wallpaper():
             base_y_frac=MOUNTAIN_BASE_Y[i],
             amplitude_frac=MOUNTAIN_AMPLITUDE[i],
             color=color,
-            seed=SEED + i * 977,  # different seed per layer -> different silhouette
+            seed=seed + i * 977,  # different seed per layer -> different silhouette
         )
 
-    img.save(OUTPUT_PATH)
+    img.save(f"{seed}.png")
     print(f"Saved wallpaper to {OUTPUT_PATH}")
 
 
