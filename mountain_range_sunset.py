@@ -56,8 +56,6 @@ MOUNTAIN_BASE_Y = np.linspace(0.5, 0.95, NUM_MOUNTAINS, True)
 # The first value is for the farthest-back mountain, the last for the closest.
 MOUNTAIN_AMPLITUDE = np.linspace(0.3, 0.2, NUM_MOUNTAINS, True)
 
-OUTPUT_PATH = "wallpaper.png"
-
 # ============================================================
 # NOISE GENERATION
 # ============================================================
