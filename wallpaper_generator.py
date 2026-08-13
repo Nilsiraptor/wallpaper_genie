@@ -43,18 +43,18 @@ MOUNTAIN_COLOR_NEAR = spectra.html("#01225e").to("lch")
 NUM_MOUNTAINS = 4          # how many mountain layers to stack
 
 # Each mountain's silhouette is built from fractal ("fBm") noise.
-NOISE_OCTAVES = 10          # more octaves = more fine detail/roughness
+NOISE_OCTAVES = 8          # more octaves = more fine detail/roughness
 NOISE_PERSISTENCE = 0.5    # how quickly amplitude shrinks per octave (0-1)
-NOISE_LACUNARITY = 2.0     # how quickly frequency grows per octave
-NOISE_BASE_FREQUENCY = 2 # base "zoominess" of the noise (higher = more bumps)
+NOISE_LACUNARITY = 1.99     # how quickly frequency grows per octave
+NOISE_BASE_FREQUENCY = 3 # base "zoominess" of the noise (higher = more bumps)
 
 # Where the mountains sit vertically, as a fraction of image height (0=top, 1=bottom).
 # The first value is for the farthest-back mountain, the last for the closest.
-MOUNTAIN_BASE_Y = np.linspace(0.55, 0.90, NUM_MOUNTAINS)
+MOUNTAIN_BASE_Y = np.linspace(0.5, 0.95, NUM_MOUNTAINS, True)
 
 # How tall each mountain's noise silhouette is, as a fraction of image height.
 # The first value is for the farthest-back mountain, the last for the closest.
-MOUNTAIN_AMPLITUDE = np.linspace(0.3, 0.2, NUM_MOUNTAINS)
+MOUNTAIN_AMPLITUDE = np.linspace(0.3, 0.2, NUM_MOUNTAINS, True)
 
 OUTPUT_PATH = "wallpaper.png"
 
@@ -154,7 +154,7 @@ def generate_wallpaper(seed=None):
             base_y_frac=MOUNTAIN_BASE_Y[i],
             amplitude_frac=MOUNTAIN_AMPLITUDE[i],
             color=color,
-            seed=seed + i * 977,  # different seed per layer -> different silhouette
+            seed=seed + i,
         )
 
     img.save(f"{seed}.png")
