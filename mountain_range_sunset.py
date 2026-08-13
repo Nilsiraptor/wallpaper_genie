@@ -45,7 +45,7 @@ NUM_MOUNTAINS = 4          # how many mountain layers to stack
 # Each mountain's silhouette is built from fractal ("fBm") noise.
 NOISE_OCTAVES = 8          # more octaves = more fine detail/roughness
 NOISE_PERSISTENCE = 0.5    # how quickly amplitude shrinks per octave (0-1)
-NOISE_LACUNARITY = 1.99     # how quickly frequency grows per octave
+NOISE_LACUNARITY = 2.0     # how quickly frequency grows per octave
 NOISE_BASE_FREQUENCY = 3 # base "zoominess" of the noise (higher = more bumps)
 
 # Where the mountains sit vertically, as a fraction of image height (0=top, 1=bottom).
