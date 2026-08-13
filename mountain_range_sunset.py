@@ -126,7 +126,7 @@ def draw_mountain(draw, width, height, base_y_frac, amplitude_frac, color, seed)
     points.append((width, height))
     points.append((0, height))
 
-    color_tuple = tuple((int(255*c) for c in color.rgb))
+    color_tuple = tuple((int(255*c) for c in color.clamped_rgb))
 
     draw.polygon(points, fill=color_tuple)
 
