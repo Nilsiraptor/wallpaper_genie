@@ -156,7 +156,7 @@ def generate_wallpaper(seed=None):
         )
 
     img.save(f"{seed}.png")
-    print(f"Saved wallpaper to {OUTPUT_PATH}")
+    print(f"Saved wallpaper to {seed}.png")
 
 
 if __name__ == "__main__":
