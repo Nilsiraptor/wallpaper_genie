@@ -56,7 +56,6 @@ def create_cloud(seed=None):
     fig, ax = plt.subplots(figsize=(10, 5))
 
     for center, r in zip(zip(circle_x, circle_y), new_radius):
-        print(r)
         circle = plt.Circle(center, r)
         ax.add_patch(circle)
 
