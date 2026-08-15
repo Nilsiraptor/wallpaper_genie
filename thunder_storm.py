@@ -66,6 +66,39 @@ def create_cloud(seed=None):
     ax.set_aspect("equal")
     plt.show()
 
+def rotate(v):
+    # rotates the vector v clockwise 90°
+    return np.array([v[1], -v[0]])
+
+def to_img(v):
+    return v[0] + 1j*v[1]
+
+def draw_arc(image_draw, start, end, puffiness=1.0):
+    r0 = (start - end) / 2
+    h = rotate(r0) * np.sqrt(1/puffiness**2 - 1)
+    r = np.linalg.norm(r0)/puffiness
+
+    center = (start + end) / 2 - h
+
+    image_draw.circle(center, 2, fill="green")
+
+    box = [
+        [c - r for c in center],
+        [c + r for c in center]
+    ]
+
+    print(box)
+
+    start_angle = np.angle(to_img(start-center), deg=True)%360
+    end_angle = np.angle(to_img(end-center), deg=True)%360
+
+    if start_angle > end_angle:
+        start_angle, end_angle = end_angle, start_angle
+
+    print(start_angle, end_angle)
+
+    image_draw.chord(box, start=start_angle, end=end_angle, fill="red")
+
 
 if __name__ == "__main__":
     create_cloud()
