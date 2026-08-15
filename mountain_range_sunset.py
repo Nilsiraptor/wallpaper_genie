@@ -9,15 +9,15 @@ Generates a wallpaper with:
 Everything you'd want to tweak lives in the CONFIG section below:
 colors, number of mountains, noise shape/roughness, image size, etc.
 
-Requires: numpy, Pillow
-    pip install numpy pillow
+Requires: numpy, Pillow, opensimplex, coloraide
+    pip install numpy pillow opensimplex coloraide
 """
 
 from random import getrandbits
 
 import numpy as np
 from PIL import Image, ImageDraw
-import spectra
+from coloraide import Color
 import opensimplex
 
 # ============================================================
@@ -26,18 +26,21 @@ import opensimplex
 
 WIDTH, HEIGHT = 2560, 1440
 
-# --- Background gradient colors (RGB 0-255) ---
-SKY_BOTTOM_COLOR = spectra.html("#FF0000").to("lch")
-SKY_MID_COLOR = spectra.html("#FF5A78").to("lch")
-SKY_TOP_COLOR = spectra.html("#FFDC5A").to("lch")
+# --- Background gradient colors ---
+# Colors are defined in OkLCH, which (unlike CIE LCH) is perceptually
+# uniform in a way that plays nicely with sRGB display gamuts, so
+# gradients and blends look smoother and avoid muddy midtones.
+SKY_BOTTOM_COLOR = Color("#FF0000").convert("oklch")
+SKY_MID_COLOR = Color("#FF5A78").convert("oklch")
+SKY_TOP_COLOR = Color("#FFDC5A").convert("oklch")
 
 # --- Mountain layer colors ---
 # The farthest-back (topmost, smallest) mountain uses MOUNTAIN_COLOR_FAR,
 # the frontmost (lowest, largest) mountain uses MOUNTAIN_COLOR_NEAR.
 # Every layer in between is linearly interpolated, so the mountains get
 # progressively darker as they get lower/closer to the viewer.
-MOUNTAIN_COLOR_FAR = spectra.html("#005d98").to("lch")
-MOUNTAIN_COLOR_NEAR = spectra.html("#01225e").to("lch")
+MOUNTAIN_COLOR_FAR = Color("#005d98").convert("oklch")
+MOUNTAIN_COLOR_NEAR = Color("#01225e").convert("oklch")
 
 # --- Mountain shape / layout ---
 NUM_MOUNTAINS = 4          # how many mountain layers to stack
@@ -90,16 +93,30 @@ def fractal_noise_1d(width, seed=None, octaves=5, persistence=0.5, lacunarity=2.
 
 
 # ============================================================
+# COLOR HELPERS
+# ============================================================
+
+def to_rgb_tuple(color):
+    """Convert an (Ok)LCH coloraide Color to a clamped 0-255 RGB int tuple."""
+    srgb = color.convert("srgb").fit()
+    return tuple(int(round(255 * c)) for c in srgb.coords())
+
+
+# ============================================================
 # DRAWING
 # ============================================================
 
 def make_background(width, height, colors):
-    """Create a vertical gradient image: top_color at y=0, bottom_color at y=height."""
-    gradient = spectra.range(colors, height)
+    """Create a vertical gradient image: colors[0] at y=0 ... colors[-1] at y=height."""
+    interpolator = Color.interpolate(colors, space="oklch")
 
-    colors = 255 * np.array([[c.clamped_rgb] for c in gradient])
+    gradient = [
+        to_rgb_tuple(interpolator(t))
+        for t in np.linspace(0, 1, height)
+    ]
 
-    background = np.tile(colors, (1, width, 1)).astype(np.uint8)
+    pixels = np.array([[rgb] for rgb in gradient], dtype=np.uint8)
+    background = np.tile(pixels, (1, width, 1))
 
     return Image.fromarray(background, mode="RGB")
 
@@ -126,7 +143,7 @@ def draw_mountain(draw, width, height, base_y_frac, amplitude_frac, color, seed)
     points.append((width, height))
     points.append((0, height))
 
-    color_tuple = tuple((int(255*c) for c in color.clamped_rgb))
+    color_tuple = to_rgb_tuple(color)
 
     draw.polygon(points, fill=color_tuple)
 
@@ -144,7 +161,7 @@ def generate_wallpaper(seed=None):
 
     for i in range(NUM_MOUNTAINS):
         t = i / max(NUM_MOUNTAINS - 1, 1)  # 0 = farthest, 1 = closest
-        color = MOUNTAIN_COLOR_FAR.blend(MOUNTAIN_COLOR_NEAR, t)
+        color = MOUNTAIN_COLOR_FAR.mix(MOUNTAIN_COLOR_NEAR, t, space="oklch")
         draw_mountain(
             draw,
             WIDTH,
