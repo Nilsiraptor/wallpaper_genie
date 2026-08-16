@@ -1,3 +1,20 @@
+"""
+Procedural Wallpaper Generator
+===============================
+Generates a wallpaper with:
+  - a dark storm-cloud background built from several layered "cloud
+    bands" (bumpy shapes made of overlapping circles), drawn
+    back-to-front, getting darker the farther back they are
+  - a jagged lightning bolt (fractal midpoint displacement) with a
+    glowing halo, breaking through the frontmost cloud bands
+
+Everything you'd want to tweak lives in the CONFIG section below:
+colors, number of cloud bands, lightning roughness, image size, etc.
+
+Requires: numpy, Pillow, opensimplex, coloraide
+    pip install numpy pillow opensimplex coloraide
+"""
+
 from random import getrandbits
 
 from coloraide import Color
@@ -6,29 +23,35 @@ import opensimplex
 from PIL import Image, ImageDraw
 
 
-# Output image size in pixels.
+# ============================================================
+# CONFIG - tweak everything here
+# ============================================================
+
 WIDTH, HEIGHT = 2560, 1440
 
-# Color used for the "lightest" end of the cloud color gradient — the topmost/frontmost cloud band is closest to this color.
+# --- Cloud colors ---
+# Color used for the "lightest" end of the cloud color gradient — the
+# topmost/frontmost cloud band is closest to this color.
 CLOUD_COLOR_LIGHT = Color("#3B4252")
-# Color used for the "darkest" end of the cloud color gradient, and also the solid background color the canvas is initialized with.
+# Color used for the "darkest" end of the cloud color gradient, and also
+# the solid background color the canvas is initialized with.
 CLOUD_COLOR_DARK = Color("#000000")
-# Exponent applied to cloud color gradient.
+# Exponent applied to the cloud color gradient.
 # <1 pushes bands toward the dark end faster (darker bands appear sooner)
 # >1 keeps bands lighter for longer.
 CLOUD_GAMMA = 1.2
 
-# Color of the lightning bolt halo/glow surrounding it.
-LIGHTNING_COLOR = Color("#7DF9FF")
-
+# --- Cloud shape / layout ---
 # Number of cloud bands (layers) drawn across the image.
 NUM_CLOUDS = 7
-# Number of overlapping "puff" circles used to build the bumpy silhouette of a single cloud band.
+# Number of overlapping "puff" circles used to build the bumpy
+# silhouette of a single cloud band.
 CLOUD_CIRCLES = 15
-# Controls how round/full each cloud puff circle. 1 means almost complete semi-circles
+# Controls how round/full each cloud puff circle is. 1 means almost
+# complete semi-circles.
 CLOUD_PUFFINESS = 0.9
-# Amount of random variation in the horizontal spacing between successive
-# cloud circles (higher = more irregular spacing between puffs).
+# Amount of random variation in the horizontal spacing between
+# successive cloud circles (higher = more irregular spacing between puffs).
 CLOUD_PUFF_VARIETY = 1.0
 # Frequency (scale) of the simplex noise sampled along the x-axis to
 # perturb each cloud band's vertical profile — higher values make the
@@ -37,21 +60,23 @@ CLOUD_NOISE_FREQUENCY = 3.0
 # Multiplier applied to the per-band height spacing before it's used to
 # scale the noise-driven vertical displacement of a band.
 CLOUD_NOISE_HEIGHT = 1.0
-# Scales the second (y) coordinate fed into the noise function per band,
-# so different bands sample a different "slice" of the noise field and
-# therefore look distinct from one another.
+# Scales the second (y) coordinate fed into the noise function per
+# band, so different bands sample a different "slice" of the noise
+# field and therefore look distinct from one another.
 CLOUD_VARIETY = 0.3
 
-# Number of cloud bands (counting from the front/lightest) that are drawn
-# on top of it — this makes the bolt look
-# like it's breaking through/behind the frontmost bands rather than
-# sitting on top of all of them.
+# --- Lightning ---
+# Color of the lightning bolt halo/glow surrounding it.
+LIGHTNING_COLOR = Color("#7DF9FF")
+# Number of cloud bands (counting from the front/lightest) that are
+# drawn on top of the lightning bolt — this makes the bolt look like
+# it's breaking through/behind the frontmost bands rather than sitting
+# on top of all of them.
 LIGHTNING_BREAKTHROUGH = 2
 # Intended number of branch bolts to add off the main lightning strike.
 # (Note: generate_lightning()/displace_segment() shown here only ever
 # produce a single unbranched bolt, so this value is not currently used.)
 LIGHTNING_BRANCHES = 1
-
 # Scales the random perpendicular displacement applied at each midpoint
 # during the fractal subdivision of the bolt — higher values make the
 # bolt path more jagged/rough.
@@ -59,29 +84,46 @@ LIGHTNING_ROUGHNESS = 1.0
 # Minimum length (in pixels) a segment must have before it stops being
 # recursively subdivided; controls the finest level of detail in the bolt.
 LIGHTNING_MIN_SEGMENT = 2
-
-# Width, in pixels, of the outermost ring of the glowing halo drawn around
-# the lightning bolt (the halo fades from transparent to full color across
-# this many concentric line-widths).
+# Width, in pixels, of the outermost ring of the glowing halo drawn
+# around the lightning bolt (the halo fades from transparent to full
+# color across this many concentric line-widths).
 LIGHTNING_HALO_WIDTH = 25
-
-# X-coordinate (at y=0, top of image) where the lightning bolt originates.
-# If None, a random x position is chosen when the bolt is drawn.
+# X-coordinate (at y=0, top of image) where the lightning bolt
+# originates. If None, a random x position is chosen when the bolt is drawn.
 LIGHTNING_ORIGIN = None
 # X-coordinate (at y=HEIGHT, bottom of image) where the lightning bolt
 # terminates. If None, a random x position is chosen — biased to the
 # opposite half of the image from LIGHTNING_ORIGIN — when the bolt is drawn.
 LIGHTNING_TARGET = None
 
-# Random seed for this run. Drives both the opensimplex noise (clouds) and
-# the numpy RNG (lightning/cloud randomness), and is also used as the
-# output PNG's filename, so a given image can be regenerated by reusing it.
+# Random seed for this run. Drives both the opensimplex noise (clouds)
+# and the numpy RNG (lightning/cloud randomness), and is also used as
+# the output PNG's filename, so a given image can be regenerated by
+# reusing it.
 SEED = getrandbits(16)
 
 RNG = np.random.default_rng(SEED)
 
 
+# ============================================================
+# COLOR HELPERS
+# ============================================================
+
+
 def get_rgb(color, fit=False):
+    """Convert a coloraide Color to a clamped 0-255 RGB int tuple.
+
+    If `fit` is True, the color is converted to sRGB and scaled to fit
+    within the 0-255 range. Otherwise it is clipped to the valid sRGB range.
+
+    Args:
+      color: A coloraide Color object.
+      fit: If True, scale the color to fit within 0-255. If False, clip
+        values to the valid sRGB range.
+
+    Returns:
+      A tuple of three integers (R, G, B) each in the range 0-255.
+    """
     new_color = color.convert("srgb")
 
     if fit:
@@ -93,6 +135,19 @@ def get_rgb(color, fit=False):
 
 
 def get_rgba(color, fit=False):
+    """Convert a coloraide Color to a clamped 0-255 RGBA int tuple.
+
+    If `fit` is True, the color is converted to sRGB and scaled to fit
+    within the 0-255 range. Otherwise it is clipped to the valid sRGB range.
+
+    Args:
+      color: A coloraide Color object that includes an alpha channel.
+      fit: If True, scale the color to fit within 0-255. If False, clip
+        values to the valid sRGB range.
+
+    Returns:
+      A tuple of four integers (R, G, B, A) each in the range 0-255.
+    """
     new_color = color.convert("srgb")
 
     if fit:
@@ -105,7 +160,20 @@ def get_rgba(color, fit=False):
     return *rgb, a
 
 
+# ============================================================
+# DRAWING
+# ============================================================
+
+
 def create_wallpaper():
+    """Generate and save a wallpaper image.
+
+    Creates a wallpaper with a dark background and several layers of
+    cloud bands drawn back-to-front, each darker than the last, with a
+    glowing lightning bolt composited so it breaks through the
+    frontmost `LIGHTNING_BREAKTHROUGH` bands. The image is saved as a
+    PNG file named after the seed.
+    """
     img = Image.new("RGBA", (WIDTH, HEIGHT), get_rgb(CLOUD_COLOR_DARK))
     pen = ImageDraw.Draw(img)
 
@@ -126,6 +194,18 @@ def create_wallpaper():
 
 
 def draw_lightning(og_image):
+    """Draw a glowing lightning bolt onto an image, in place.
+
+    Generates a jagged bolt via fractal midpoint displacement between a
+    random (or configured) origin at the top of the image and target at
+    the bottom, then composites it on: first a soft colored halo that
+    fades from transparent to `LIGHTNING_COLOR`, then a solid white core.
+
+    Args:
+      og_image: The PIL RGBA Image to composite the lightning onto, in
+        place. LIGHTNING_ORIGIN and LIGHTNING_TARGET are resolved (and
+        stored back into those globals) if not already set.
+    """
     global LIGHTNING_ORIGIN, LIGHTNING_TARGET
     image = Image.new("RGBA", og_image.size, (0, 0, 0, 0))
     pen = ImageDraw.Draw(image)
@@ -148,7 +228,6 @@ def draw_lightning(og_image):
     gradient = Color.interpolate([transparent, LIGHTNING_COLOR], out_space="srgb")
 
     for w, t in enumerate(halo):
-        # print(w, t, get_rgba(gradient(t)))
         pen.line(
             light,
             fill=get_rgba(gradient(t**2)),
@@ -161,42 +240,22 @@ def draw_lightning(og_image):
     og_image.alpha_composite(image)
 
 
-def displace_segment(p0, p1):
-    """Recursively subdivide the segment p0->p1, displacing each new
-    midpoint perpendicular to the segment by a shrinking random amount
-    (classic 1D midpoint-displacement / fractional Brownian bridge).
-    Returns the list of points from just after p0 up to and including p1."""
-    length = np.linalg.norm(p1 - p0)
-    if length <= LIGHTNING_MIN_SEGMENT:
-        return [p1.tolist()]
-
-    mid = (p0 + p1) / 2
-    direction = p1 - p0
-    perpendicular = rotate(direction)
-    displacement = RNG.random(2).mean() - 0.5
-    displacement *= LIGHTNING_ROUGHNESS
-    mid = mid + perpendicular * displacement
-
-    left = displace_segment(p0, mid)
-    right = displace_segment(mid, p1)
-    return left + right
-
-
-def generate_lightning(x, target):
-    """Pure midpoint displacement: recursively bisect the straight
-    origin->target segment, displacing each new midpoint perpendicular
-    to its parent segment by a shrinking random amount. No coarse
-    random-walk skeleton is used — the fractal recursion alone
-    produces both the macro bend and the fine jitter."""
-
-    origin = np.array([x, 0.0])
-    target = np.array(target)
-
-    lightning = [origin.tolist()] + displace_segment(origin, target)
-    return lightning
-
-
 def draw_cloud_band(pen, baseline, height, color):
+    """Draw a single cloud band as a row of overlapping puff circles.
+
+    Builds a bumpy silhouette from irregularly spaced circles perturbed
+    by simplex noise, fills the polygon under that silhouette, then
+    draws each puff circle on top to round out the band's outline.
+
+    Args:
+      pen: A PIL ImageDraw drawing context.
+      baseline: The vertical position of this band's silhouette, as a
+        fraction of image height (0=top, 1=bottom).
+      height: The vertical spacing allotted to this band (in the same
+        fractional units as `baseline`), used to scale the
+        noise-driven vertical displacement of the band.
+      color: The coloraide Color object for this cloud band.
+    """
     opensimplex.seed(SEED)
 
     start = RNG.random() / (-CLOUD_CIRCLES)
@@ -235,16 +294,23 @@ def draw_cloud_band(pen, baseline, height, color):
         draw_bubble(pen, np.array([x, y]), np.array([a, b]), color, CLOUD_PUFFINESS)
 
 
-def rotate(v):
-    # rotates the vector v clockwise 90°
-    return np.array([v[1], -v[0]])
-
-
-def to_img(v):
-    return v[0] + 1j * v[1]
-
-
 def draw_bubble(image_draw, start, end, color, puffiness=1.0):
+    """Draw a single "puff" circle spanning between two points.
+
+    Computes a circle that passes through (approximately) `start` and
+    `end`, bulging perpendicular to the segment between them by an
+    amount controlled by `puffiness`, and fills it.
+
+    Args:
+      image_draw: A PIL ImageDraw drawing context.
+      start: A 2-element array with the (x, y) coordinate of one end
+        of the puff.
+      end: A 2-element array with the (x, y) coordinate of the other
+        end of the puff.
+      color: The coloraide Color object to fill the circle with.
+      puffiness: Controls how round/full the circle is. 1.0 produces
+        an almost-complete semicircle; values below 1 flatten it.
+    """
     r0 = (start - end) / 2
     h = rotate(r0) * np.sqrt(1 / puffiness**2 - 1)
     r = np.linalg.norm(r0) / puffiness
@@ -252,6 +318,79 @@ def draw_bubble(image_draw, start, end, color, puffiness=1.0):
     center = (start + end) / 2 - h
 
     image_draw.circle(center, r, fill=get_rgb(color))
+
+
+# ============================================================
+# LIGHTNING GEOMETRY HELPERS
+# ============================================================
+
+
+def generate_lightning(x, target):
+    """Generate a jagged lightning bolt path via fractal midpoint displacement.
+
+    Recursively bisects the straight origin->target segment, displacing
+    each new midpoint perpendicular to its parent segment by a
+    shrinking random amount. No coarse random-walk skeleton is used —
+    the fractal recursion alone produces both the macro bend and the
+    fine jitter.
+
+    Args:
+      x: The x-coordinate (at y=0, top of image) where the bolt originates.
+      target: A 2-element [x, y] coordinate where the bolt terminates.
+
+    Returns:
+      A list of [x, y] points describing the full bolt path from
+      origin to target.
+    """
+    origin = np.array([x, 0.0])
+    target = np.array(target)
+
+    lightning = [origin.tolist()] + displace_segment(origin, target)
+    return lightning
+
+
+def displace_segment(p0, p1):
+    """Recursively subdivide the segment p0->p1 via midpoint displacement.
+
+    Each new midpoint is displaced perpendicular to the segment by a
+    shrinking random amount (classic 1D midpoint-displacement /
+    fractional Brownian bridge), producing a jagged path between the
+    two endpoints. Recursion stops once a segment is no longer longer
+    than `LIGHTNING_MIN_SEGMENT`.
+
+    Args:
+      p0: A 2-element array with the (x, y) coordinate of the segment start.
+      p1: A 2-element array with the (x, y) coordinate of the segment end.
+
+    Returns:
+      A list of [x, y] points from just after p0 up to and including p1.
+    """
+    length = np.linalg.norm(p1 - p0)
+    if length <= LIGHTNING_MIN_SEGMENT:
+        return [p1.tolist()]
+
+    mid = (p0 + p1) / 2
+    direction = p1 - p0
+    perpendicular = rotate(direction)
+    displacement = RNG.random(2).mean() - 0.5
+    displacement *= LIGHTNING_ROUGHNESS
+    mid = mid + perpendicular * displacement
+
+    left = displace_segment(p0, mid)
+    right = displace_segment(mid, p1)
+    return left + right
+
+
+def rotate(v):
+    """Rotate a 2D vector 90 degrees clockwise.
+
+    Args:
+      v: A 2-element array [x, y].
+
+    Returns:
+      A 2-element array containing the rotated vector.
+    """
+    return np.array([v[1], -v[0]])
 
 
 if __name__ == "__main__":
