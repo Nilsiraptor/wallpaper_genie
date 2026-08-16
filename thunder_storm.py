@@ -1,4 +1,3 @@
-from itertools import pairwise
 from random import getrandbits
 
 from coloraide import Color
@@ -26,9 +25,6 @@ CLOUD_VARIETY = 0.3
 NUM_LIGHTNINGS = 1
 LIGHTNING_BREAKTHROUGH = 2
 LIGHTNING_BRANCHES = 1
-
-LIGHTNING_STEP_RATIO = 0.1
-LIGHTNING_MOMENTUM = 0.3
 
 LIGHTNING_ROUGHNESS = 1.0
 LIGHTNING_MIN_SEGMENT = 2
@@ -123,30 +119,6 @@ def draw_lightning(og_image):
     og_image.alpha_composite(image)
 
 
-def generate_skeleton(x, direction, target):
-    """Coarse random walk with large steps. This alone decides the macro
-    shape of the bolt (overall bend toward the target, big direction
-    changes) — fine texture is added afterwards by midpoint displacement."""
-    pos = np.array([x, 0.0])
-    skeleton = [pos.tolist()]
-
-    intended_dir = direction
-    step_size = HEIGHT * LIGHTNING_STEP_RATIO
-    kappa = 5
-
-    while pos[1] < HEIGHT:
-        to_target = np.arctan2(target[1] - pos[1], target[0] - pos[0])
-        intended_dir = LIGHTNING_MOMENTUM * intended_dir + (1 - LIGHTNING_MOMENTUM) * to_target
-
-        step_dir = RNG.vonmises(intended_dir, kappa)
-        intended_dir = step_dir
-
-        pos += step_size * np.array([np.cos(step_dir), np.sin(step_dir)])
-        skeleton.append(pos.tolist())
-
-    return skeleton
-
-
 def displace_segment(p0, p1):
     """Recursively subdivide the segment p0->p1, displacing each new
     midpoint perpendicular to the segment by a shrinking random amount
@@ -168,17 +140,17 @@ def displace_segment(p0, p1):
     return left + right
 
 
-def generate_lightning(x=WIDTH / 2, direction=np.pi / 2, target=None):
-    if target is None:
-        target = np.array([WIDTH / 2, HEIGHT])
+def generate_lightning(x, target):
+    """Pure midpoint displacement: recursively bisect the straight
+    origin->target segment, displacing each new midpoint perpendicular
+    to its parent segment by a shrinking random amount. No coarse
+    random-walk skeleton is used — the fractal recursion alone
+    produces both the macro bend and the fine jitter."""
 
-    skeleton = generate_skeleton(x, direction, target)
+    origin = np.array([x, 0.0])
+    target = np.array(target)
 
-    lightning = [skeleton[0]]
-    for p0, p1 in pairwise(skeleton):
-        p0, p1 = np.array(p0), np.array(p1)
-        lightning += displace_segment(p0, p1)
-
+    lightning = [origin.tolist()] + displace_segment(origin, target)
     return lightning
 
 
