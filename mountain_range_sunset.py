@@ -31,17 +31,17 @@ WIDTH, HEIGHT = 2560, 1440
 # Colors are defined in OkLCH, which (unlike CIE LCH) is perceptually
 # uniform in a way that plays nicely with sRGB display gamuts, so
 # gradients and blends look smoother and avoid muddy midtones.
-SKY_BOTTOM_COLOR = Color("#FF0000").convert("oklch")
-SKY_MID_COLOR = Color("#FF5A78").convert("oklch")
-SKY_TOP_COLOR = Color("#FFDC5A").convert("oklch")
+SKY_BOTTOM_COLOR = Color("#FF0000")
+SKY_MID_COLOR = Color("#FF5A78")
+SKY_TOP_COLOR = Color("#FFDC5A")
 
 # --- Mountain layer colors ---
 # The farthest-back (topmost, smallest) mountain uses MOUNTAIN_COLOR_FAR,
 # the frontmost (lowest, largest) mountain uses MOUNTAIN_COLOR_NEAR.
 # Every layer in between is linearly interpolated, so the mountains get
 # progressively darker as they get lower/closer to the viewer.
-MOUNTAIN_COLOR_FAR = Color("#005d98").convert("oklch")
-MOUNTAIN_COLOR_NEAR = Color("#01225e").convert("oklch")
+MOUNTAIN_COLOR_FAR = Color("#005d98")
+MOUNTAIN_COLOR_NEAR = Color("#01225e")
 
 # --- Mountain shape / layout ---
 NUM_MOUNTAINS = 4  # how many mountain layers to stack
@@ -102,10 +102,14 @@ def fractal_noise_1d(
 # ============================================================
 
 
-def to_rgb_tuple(color):
+def to_rgb_tuple(color, fit=False):
     """Convert an (Ok)LCH coloraide Color to a clamped 0-255 RGB int tuple."""
-    srgb = color.convert("srgb").fit()
-    return tuple(int(round(255 * c)) for c in srgb.coords())
+    if fit:
+        srgb = color.convert("srgb").fit()
+    else:
+        srgb = color.convert("srgb").clip()
+
+    return tuple(round(255 * c) for c in srgb.coords())
 
 
 # ============================================================
