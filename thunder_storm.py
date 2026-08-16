@@ -2,69 +2,143 @@ from random import getrandbits, random
 
 import numpy as np
 from PIL import Image, ImageDraw
-import spectra
+from coloraide import Color
 import opensimplex
-import matplotlib.pyplot as plt
 
 
 WIDTH, HEIGHT = 2560, 1440
 
-CLOUD_COLOR_LIGHT = "#3B4252"
-CLOUD_COLOR_DARK = "#11141A"
+CLOUD_COLOR_LIGHT = Color("#3B4252")
+CLOUD_COLOR_DARK = Color("#000000")
+CLOUD_GAMMA = 1.1
 
-LIGHTNING_COLORS = [
-    "#00F0FF"
-]
+LIGHTNING_COLOR = Color("#00F0FF")
 
-NUM_CLOUDS = 5
-CLOUD_CIRCLES = 10
-CLOUD_PUFFINESS = 1.0
-CLOUD_PUFFINESS_VARIETY = 0.2
-CLOUD_PUFFINESS_FREQUENCY = 2.0
+NUM_CLOUDS = 7
+CLOUD_CIRCLES = 15
+CLOUD_PUFFINESS = 0.9
+CLOUD_PUFFINESS_VARIETY = 1.0
 CLOUD_NOISE_FREQUENCY = 3.0
-CLOUD_NOISE_HEIGHT = 0.15
+CLOUD_NOISE_HEIGHT = 1.0
+CLOUD_VARIETY = 0.3
 
 NUM_LIGHTNINGS = 1
+LIGHTNING_BREAKTHROUGH = 2
 LIGHTNING_BRANCHES = 1
 
-LIGHTNING_ATTRACTION = 2.0
+LIGHTNING_MOMENTUM = 0.9
+LIGHTNING_STRAIGHTNESS = 0.1
+LIGHTNING_HALO_WIDTH = 20
 
-def create_cloud(seed=None):
-    if seed is None:
-        seed = getrandbits(16)
+SEED = getrandbits(16)
 
-    xs = np.linspace(0, 1, WIDTH, True)
+rng = np.random.default_rng(SEED)
 
-    opensimplex.seed(seed)
-    baseline = opensimplex.noise2array(CLOUD_NOISE_FREQUENCY*xs, np.ones(1))
-    baseline *= CLOUD_NOISE_HEIGHT
+def get_rgb(color, fit=False):
+    new_color = color.convert("srgb")
 
-    circle_x, dist = np.linspace(0, 1, CLOUD_CIRCLES+1, True, True)
-    circle_y = opensimplex.noise2array(circle_x*CLOUD_NOISE_FREQUENCY, np.ones(1))[0]
-    circle_y *= CLOUD_NOISE_HEIGHT
+    if fit:
+        new_color.fit()
+    else:
+        new_color.clip()
 
-    distances = np.hypot(np.diff(circle_x), np.diff(circle_y))
-    max_dist = distances.max()
+    return tuple(int(255*c) for c in new_color.coords())
 
-    radius_change = opensimplex.noise2array(CLOUD_PUFFINESS_FREQUENCY*circle_x, 40*np.ones(1))[0]
+def get_rgba(color, fit=False):
+    new_color = color.convert("srgb")
 
-    radius_change -= radius_change.min()
-    new_radius = 1 + CLOUD_PUFFINESS_VARIETY * radius_change
-    scale = max_dist/2/CLOUD_PUFFINESS / new_radius.min()
-    new_radius *= scale
+    if fit:
+        new_color.fit()
+    else:
+        new_color.clip()
 
-    fig, ax = plt.subplots(figsize=(10, 5))
+    rgb = [int(255*c) for c in new_color.coords()]
+    a = int(255*new_color[-1])
+    return *rgb, a
 
-    for center, r in zip(zip(circle_x, circle_y), new_radius):
-        circle = plt.Circle(center, r)
-        ax.add_patch(circle)
+def create_wallpaper():
+    img = Image.new("RGBA", (WIDTH, HEIGHT), get_rgb(CLOUD_COLOR_DARK))
+    pen = ImageDraw.Draw(img)
 
-    ax.fill_between(xs, baseline[0], 1)
+    offsets, height = np.linspace(0, 1, NUM_CLOUDS, False, True)
+    gradient = Color.interpolate([CLOUD_COLOR_LIGHT, CLOUD_COLOR_DARK], space="oklch", out_space="srgb")
+    for o in reversed(offsets[LIGHTNING_BREAKTHROUGH:]):
+        draw_cloud_band(pen, o, height*CLOUD_NOISE_HEIGHT, gradient(o**CLOUD_GAMMA))
 
-    ax.set_xlim(0, 1)
-    ax.set_ylim(baseline.min()-max_dist/CLOUD_PUFFINESS, baseline.max()+max_dist)
-    ax.set_aspect("equal")
-    plt.show()
+    draw_lightning(img)
+
+    for o in reversed(offsets[:LIGHTNING_BREAKTHROUGH]):
+        draw_cloud_band(pen, o, height*CLOUD_NOISE_HEIGHT, gradient(o**CLOUD_GAMMA))
+
+    img.show()
+
+def draw_lightning(og_image):
+    image = Image.new("RGBA", og_image.size, (0, 0, 0, 0))
+    pen = ImageDraw.Draw(image)
+
+    light = generate_lightning(direction=np.pi/4)
+
+    transparent = Color(LIGHTNING_COLOR)
+    transparent[-1] = 0.0
+
+    halo = np.linspace(0, 1, LIGHTNING_HALO_WIDTH, True)
+
+    gradient = Color.interpolate([transparent, LIGHTNING_COLOR], out_space="srgb")
+
+    for w, t in enumerate(halo):
+        # print(w, t, get_rgba(gradient(t)))
+        pen.line(light, fill=get_rgba(gradient(t**2)), width=1+LIGHTNING_HALO_WIDTH-w, joint="curve")
+
+    pen.line(light, fill="white", width=2)
+
+    og_image.alpha_composite(image)
+
+def generate_lightning(x=WIDTH/2, direction=np.pi/2):
+    lightning = [[x, 0]]
+
+    last_dir = direction
+    while lightning[-1][1] < HEIGHT:
+        new_dir = LIGHTNING_MOMENTUM*last_dir + (1-LIGHTNING_MOMENTUM)*np.pi/2
+        new_dir = rng.vonmises(new_dir, LIGHTNING_STRAIGHTNESS*100)
+
+        new_x = lightning[-1][0] + np.cos(new_dir)
+        new_y = lightning[-1][1] + np.sin(new_dir)
+
+        lightning.append([new_x, new_y])
+        last_dir = new_dir
+
+    return lightning
+
+def draw_cloud_band(pen, baseline, height, color):
+    opensimplex.seed(SEED)
+
+    start = rng.random()/(-CLOUD_CIRCLES)
+
+    circle_x = [start]
+
+    while circle_x[-1] < 1:
+        step = np.abs(rng.normal(loc=1/CLOUD_CIRCLES, scale=0.5*CLOUD_PUFFINESS_VARIETY/CLOUD_CIRCLES))
+        step += 1/CLOUD_CIRCLES/2
+        new_circle = circle_x[-1] + step
+        circle_x.append(new_circle)
+
+    circle_x = np.array(circle_x)
+
+    circle_y = opensimplex.noise2array(circle_x*CLOUD_NOISE_FREQUENCY, baseline/height*CLOUD_VARIETY*np.ones(1))[0]
+    circle_y *= height
+    circle_y += baseline
+
+    circle_x *= WIDTH
+    circle_y *= HEIGHT
+
+    cloud = np.stack([circle_x, circle_y], axis=1).tolist()
+    cloud.append([WIDTH, 0])
+    cloud.append([0, 0])
+
+    pen.polygon(cloud, fill=get_rgb(color))
+
+    for x, y, a, b in zip(circle_x, circle_y, circle_x[1:], circle_y[1:]):
+        draw_bubble(pen, np.array([x, y]), np.array([a, b]), color, CLOUD_PUFFINESS)
 
 def rotate(v):
     # rotates the vector v clockwise 90°
@@ -73,32 +147,14 @@ def rotate(v):
 def to_img(v):
     return v[0] + 1j*v[1]
 
-def draw_arc(image_draw, start, end, puffiness=1.0):
+def draw_bubble(image_draw, start, end, color, puffiness=1.0):
     r0 = (start - end) / 2
     h = rotate(r0) * np.sqrt(1/puffiness**2 - 1)
     r = np.linalg.norm(r0)/puffiness
 
     center = (start + end) / 2 - h
 
-    image_draw.circle(center, 2, fill="green")
-
-    box = [
-        [c - r for c in center],
-        [c + r for c in center]
-    ]
-
-    print(box)
-
-    start_angle = np.angle(to_img(start-center), deg=True)%360
-    end_angle = np.angle(to_img(end-center), deg=True)%360
-
-    if start_angle > end_angle:
-        start_angle, end_angle = end_angle, start_angle
-
-    print(start_angle, end_angle)
-
-    image_draw.chord(box, start=start_angle, end=end_angle, fill="red")
-
+    image_draw.circle(center, r, fill=get_rgb(color))
 
 if __name__ == "__main__":
-    create_cloud()
+    create_wallpaper()
