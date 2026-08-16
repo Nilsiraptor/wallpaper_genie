@@ -124,14 +124,14 @@ def get_rgb(color, fit=False):
     Returns:
       A tuple of three integers (R, G, B) each in the range 0-255.
     """
-    new_color = color.convert("srgb")
+    srgb = color.convert("srgb")
 
     if fit:
-        new_color.fit()
+        srgb.fit()
     else:
-        new_color.clip()
+        srgb.clip()
 
-    return tuple(int(255 * c) for c in new_color.coords())
+    return tuple(int(255 * c) for c in srgb.coords())
 
 
 def get_rgba(color, fit=False):
@@ -148,15 +148,15 @@ def get_rgba(color, fit=False):
     Returns:
       A tuple of four integers (R, G, B, A) each in the range 0-255.
     """
-    new_color = color.convert("srgb")
+    srgb = color.convert("srgb")
 
     if fit:
-        new_color.fit()
+        srgb.fit()
     else:
-        new_color.clip()
+        srgb.clip()
 
-    rgb = [int(255 * c) for c in new_color.coords()]
-    a = int(255 * new_color[-1])
+    rgb = [int(255 * c) for c in srgb.coords()]
+    a = int(255 * srgb[-1])
     return *rgb, a
 
 
