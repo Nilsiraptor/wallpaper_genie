@@ -1,0 +1,14 @@
+line-length = 100
+indent-width = 4
+
+target-version = "py313"
+
+[lint.isort]
+combine-as-imports = true
+force-sort-within-sections = true
+lines-after-imports = 2
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"

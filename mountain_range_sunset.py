@@ -15,10 +15,11 @@ Requires: numpy, Pillow, opensimplex, coloraide
 
 from random import getrandbits
 
-import numpy as np
-from PIL import Image, ImageDraw
 from coloraide import Color
+import numpy as np
 import opensimplex
+from PIL import Image, ImageDraw
+
 
 # ============================================================
 # CONFIG - tweak everything here
@@ -43,13 +44,13 @@ MOUNTAIN_COLOR_FAR = Color("#005d98").convert("oklch")
 MOUNTAIN_COLOR_NEAR = Color("#01225e").convert("oklch")
 
 # --- Mountain shape / layout ---
-NUM_MOUNTAINS = 4          # how many mountain layers to stack
+NUM_MOUNTAINS = 4  # how many mountain layers to stack
 
 # Each mountain's silhouette is built from fractal ("fBm") noise.
-NOISE_OCTAVES = 8          # more octaves = more fine detail/roughness
-NOISE_PERSISTENCE = 0.5    # how quickly amplitude shrinks per octave (0-1)
-NOISE_LACUNARITY = 2.0     # how quickly frequency grows per octave
-NOISE_BASE_FREQUENCY = 3 # base "zoominess" of the noise (higher = more bumps)
+NOISE_OCTAVES = 8  # more octaves = more fine detail/roughness
+NOISE_PERSISTENCE = 0.5  # how quickly amplitude shrinks per octave (0-1)
+NOISE_LACUNARITY = 2.0  # how quickly frequency grows per octave
+NOISE_BASE_FREQUENCY = 3  # base "zoominess" of the noise (higher = more bumps)
 
 # Where the mountains sit vertically, as a fraction of image height (0=top, 1=bottom).
 # The first value is for the farthest-back mountain, the last for the closest.
@@ -63,8 +64,10 @@ MOUNTAIN_AMPLITUDE = np.linspace(0.3, 0.2, NUM_MOUNTAINS, True)
 # NOISE GENERATION
 # ============================================================
 
-def fractal_noise_1d(width, seed=None, octaves=5, persistence=0.5, lacunarity=2.0,
-                      base_frequency=2.0):
+
+def fractal_noise_1d(
+    width, seed=None, octaves=5, persistence=0.5, lacunarity=2.0, base_frequency=2.0
+):
     """
     Fractal Brownian Motion (fBm): sums several octaves of value noise
     at increasing frequency / decreasing amplitude for a natural,
@@ -83,7 +86,9 @@ def fractal_noise_1d(width, seed=None, octaves=5, persistence=0.5, lacunarity=2.
     opensimplex.seed(seed)
 
     for octave in range(octaves):
-        total += np.array([opensimplex.noise2(x=x * frequency, y=128*octave) * amplitude for x in xs])
+        total += np.array(
+            [opensimplex.noise2(x=x * frequency, y=128 * octave) * amplitude for x in xs]
+        )
         max_amplitude += amplitude
         amplitude *= persistence
         frequency *= lacunarity
@@ -96,6 +101,7 @@ def fractal_noise_1d(width, seed=None, octaves=5, persistence=0.5, lacunarity=2.
 # COLOR HELPERS
 # ============================================================
 
+
 def to_rgb_tuple(color):
     """Convert an (Ok)LCH coloraide Color to a clamped 0-255 RGB int tuple."""
     srgb = color.convert("srgb").fit()
@@ -106,14 +112,12 @@ def to_rgb_tuple(color):
 # DRAWING
 # ============================================================
 
+
 def make_background(width, height, colors):
     """Create a vertical gradient image: colors[0] at y=0 ... colors[-1] at y=height."""
     interpolator = Color.interpolate(colors, space="oklch")
 
-    gradient = [
-        to_rgb_tuple(interpolator(t))
-        for t in np.linspace(0, 1, height)
-    ]
+    gradient = [to_rgb_tuple(interpolator(t)) for t in np.linspace(0, 1, height)]
 
     pixels = np.array([[rgb] for rgb in gradient], dtype=np.uint8)
     background = np.tile(pixels, (1, width, 1))
@@ -152,11 +156,15 @@ def generate_wallpaper(seed=None):
     if seed is None:
         seed = getrandbits(16)
 
-    img = make_background(WIDTH, HEIGHT, [
-        SKY_TOP_COLOR,
-        SKY_MID_COLOR,
-        SKY_BOTTOM_COLOR,
-    ])
+    img = make_background(
+        WIDTH,
+        HEIGHT,
+        [
+            SKY_TOP_COLOR,
+            SKY_MID_COLOR,
+            SKY_BOTTOM_COLOR,
+        ],
+    )
     draw = ImageDraw.Draw(img)
 
     for i in range(NUM_MOUNTAINS):

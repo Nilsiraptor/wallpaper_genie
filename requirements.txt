@@ -2,3 +2,4 @@ numpy==2.5.2
 opensimplex==0.4.5.1
 pillow==12.3.0
 coloraide==8.11.1
+ruff==0.16.3
