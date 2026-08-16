@@ -68,10 +68,29 @@ MOUNTAIN_AMPLITUDE = np.linspace(0.3, 0.2, NUM_MOUNTAINS, True)
 def fractal_noise_1d(
     width, seed=None, octaves=5, persistence=0.5, lacunarity=2.0, base_frequency=2.0
 ):
-    """
-    Fractal Brownian Motion (fBm): sums several octaves of value noise
-    at increasing frequency / decreasing amplitude for a natural,
-    rough silhouette. Returns an array of length `width` normalized to [-1, 1].
+    """Generate fractal Brownian Motion (fBm) noise for a 1D silhouette.
+
+    Sums several octaves of value noise at increasing frequency and
+    decreasing amplitude to produce a natural, rough mountain ridge line.
+    The result is an array of length `width` normalized to roughly [-1, 1].
+
+    Args:
+      width: The number of samples (image width).
+      seed: A random seed for reproducibility. If None, a random seed is used.
+      octaves: The number of noise octaves to sum. More octaves produce
+        finer detail and a rougher silhouette.
+      persistence: How quickly amplitude shrinks per octave (0 to 1). Lower
+        values produce smoother noise.
+      lacunarity: How quickly frequency grows per octave. Higher values
+        produce more closely spaced bumps.
+      base_frequency: The base frequency of the noise. Higher values produce
+        more closely spaced bumps.
+
+    Returns:
+      An array of length `width` with values roughly in [-1, 1].
+
+    Raises:
+      TypeError: If `width` is not an integer.
     """
 
     if seed is None:
@@ -103,7 +122,19 @@ def fractal_noise_1d(
 
 
 def to_rgb_tuple(color, fit=False):
-    """Convert an (Ok)LCH coloraide Color to a clamped 0-255 RGB int tuple."""
+    """Convert an (Ok)LCH coloraide Color to a clamped 0-255 RGB int tuple.
+
+    If `fit` is True, the color is converted to sRGB and scaled to fit
+    within the 0-255 range. Otherwise it is clipped to the valid sRGB range.
+
+    Args:
+      color: A coloraide Color object in OkLCH or LCH color space.
+      fit: If True, scale the color to fit within 0-255. If False, clip
+        values to the valid sRGB range.
+
+    Returns:
+      A tuple of three integers (R, G, B) each in the range 0-255.
+    """
     if fit:
         srgb = color.convert("srgb").fit()
     else:
@@ -118,7 +149,21 @@ def to_rgb_tuple(color, fit=False):
 
 
 def make_background(width, height, colors):
-    """Create a vertical gradient image: colors[0] at y=0 ... colors[-1] at y=height."""
+    """Create a vertical gradient image from a list of colors.
+
+    Interpolates between the provided colors in OkLCH space and creates
+    an RGB image where the gradient runs from colors[0] at the top
+    (y=0) to colors[-1] at the bottom (y=height).
+
+    Args:
+      width: The image width in pixels.
+      height: The image height in pixels.
+      colors: A list of coloraide Color objects defining the gradient.
+        The first color appears at the top and the last at the bottom.
+
+    Returns:
+      A PIL Image in RGB mode with the vertical gradient.
+    """
     interpolator = Color.interpolate(colors, space="oklch")
 
     gradient = [to_rgb_tuple(interpolator(t)) for t in np.linspace(0, 1, height)]
@@ -130,9 +175,22 @@ def make_background(width, height, colors):
 
 
 def draw_mountain(draw, width, height, base_y_frac, amplitude_frac, color, seed):
-    """
-    Draw a single mountain layer: the region under a noise curve,
-    filled down to the bottom of the image.
+    """Draw a single mountain layer as a filled polygon.
+
+    Generates a fractal noise silhouette and fills the area under the
+    ridge line down to the bottom of the image. The mountain gets
+    darker as it gets lower/closer to the viewer.
+
+    Args:
+      draw: A PIL ImageDraw drawing context.
+      width: The image width in pixels.
+      height: The image height in pixels.
+      base_y_frac: The vertical position of the mountain base as a fraction
+        of image height (0=top, 1=bottom).
+      amplitude_frac: The height of the mountain's noise silhouette as a
+        fraction of image height.
+      color: The coloraide Color object for this mountain layer.
+      seed: A random seed for the noise generation.
     """
     noise = fractal_noise_1d(
         width,
@@ -157,6 +215,16 @@ def draw_mountain(draw, width, height, base_y_frac, amplitude_frac, color, seed)
 
 
 def generate_wallpaper(seed=None):
+    """Generate and save a wallpaper image.
+
+    Creates a wallpaper with a vertical color gradient background and
+    several layers of mountains drawn back-to-front, each darker than
+    the last. The image is saved as a PNG file named after the seed.
+
+    Args:
+      seed: An optional random seed for reproducibility. If None, a random
+        seed is generated.
+    """
     if seed is None:
         seed = getrandbits(16)
 
