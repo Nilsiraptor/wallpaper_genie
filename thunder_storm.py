@@ -73,10 +73,10 @@ LIGHTNING_COLOR = Color("#7DF9FF")
 # it's breaking through/behind the frontmost bands rather than sitting
 # on top of all of them.
 LIGHTNING_BREAKTHROUGH = 2
-# Intended number of branch bolts to add off the main lightning strike.
-# (Note: generate_lightning()/displace_segment() shown here only ever
-# produce a single unbranched bolt, so this value is not currently used.)
-LIGHTNING_BRANCHES = 1
+# Number of branch bolts to add off the main lightning strike. Each
+# branch is drawn with half the main bolt's LIGHTNING_HALO_WIDTH, so
+# branches read as thinner/dimmer than the main strike.
+LIGHTNING_BRANCHES = 2
 # Scales the random perpendicular displacement applied at each midpoint
 # during the fractal subdivision of the bolt — higher values make the
 # bolt path more jagged/rough.
@@ -193,22 +193,24 @@ def create_wallpaper():
     print(f"Saved wallpaper to {SEED}.png")
 
 
-def draw_lightning(og_image):
-    """Draw a glowing lightning bolt onto an image, in place.
+def draw_lightning(img):
+    """Draw a glowing lightning bolt, with branches, onto an image.
 
-    Generates a jagged bolt via fractal midpoint displacement between a
-    random (or configured) origin at the top of the image and target at
-    the bottom, then composites it on: first a soft colored halo that
-    fades from transparent to `LIGHTNING_COLOR`, then a solid white core.
+    Generates the main jagged bolt via fractal midpoint displacement
+    between a random (or configured) origin at the top of the image
+    and target at the bottom, generates and composites
+    `LIGHTNING_BRANCHES` branch bolts off of it (via `create_branch()`,
+    each with a thinner/dimmer halo than the main bolt), then composites
+    the main bolt itself on top via `draw_bolt()` so it sits in front of
+    its own branches.
 
     Args:
-      og_image: The PIL RGBA Image to composite the lightning onto, in
-        place. LIGHTNING_ORIGIN and LIGHTNING_TARGET are resolved (and
-        stored back into those globals) if not already set.
+      img: The PIL RGBA Image to composite the lightning and its
+        branches onto, in place. LIGHTNING_ORIGIN and LIGHTNING_TARGET
+        are resolved (and stored back into those globals) if not
+        already set.
     """
     global LIGHTNING_ORIGIN, LIGHTNING_TARGET
-    image = Image.new("RGBA", og_image.size, (0, 0, 0, 0))
-    pen = ImageDraw.Draw(image)
 
     if LIGHTNING_ORIGIN is None:
         LIGHTNING_ORIGIN = RNG.random(2).mean() * WIDTH
@@ -220,24 +222,11 @@ def draw_lightning(og_image):
 
     light = generate_lightning(x=LIGHTNING_ORIGIN, target=[LIGHTNING_TARGET, HEIGHT])
 
-    transparent = Color(LIGHTNING_COLOR)
-    transparent[-1] = 0.0
+    for _ in range(LIGHTNING_BRANCHES):
+        create_branch(img, light, LIGHTNING_HALO_WIDTH // 2, LIGHTNING_BRANCHES // 2)
 
-    halo = np.linspace(0, 1, LIGHTNING_HALO_WIDTH, True)
-
-    gradient = Color.interpolate([transparent, LIGHTNING_COLOR], out_space="srgb")
-
-    for w, t in enumerate(halo):
-        pen.line(
-            light,
-            fill=get_rgba(gradient(t**2)),
-            width=1 + LIGHTNING_HALO_WIDTH - w,
-            joint="curve",
-        )
-
-    pen.line(light, fill="white", width=2)
-
-    og_image.alpha_composite(image)
+    bolt_image = draw_bolt(img, light, LIGHTNING_HALO_WIDTH)
+    img.alpha_composite(bolt_image)
 
 
 def draw_cloud_band(pen, baseline, height, color):
@@ -379,6 +368,115 @@ def displace_segment(p0, p1):
     left = displace_segment(p0, mid)
     right = displace_segment(mid, p1)
     return left + right
+
+
+def draw_bolt(og_image, line, halo_width):
+    """Render a single jagged bolt path as a standalone glow layer.
+
+    Draws a soft colored halo along `line` that fades from transparent
+    to `LIGHTNING_COLOR` over `halo_width` concentric passes, then a
+    solid white core on top. Used for both the main lightning strike
+    and each branch, so halo width can be varied per-call to make
+    branches read as thinner/dimmer than the main bolt.
+
+    Args:
+      og_image: The PIL RGBA Image the bolt will eventually be
+        composited onto; only its size is used to create a matching
+        transparent layer to draw on.
+      line: A list of [x, y] points describing the bolt path, as
+        returned by `generate_lightning()` or built from
+        `displace_segment()`.
+      halo_width: Width, in pixels, of the outermost ring of the
+        glowing halo drawn around the bolt.
+
+    Returns:
+      A new PIL RGBA Image, the same size as `og_image`, containing
+      just this bolt's halo and core on a transparent background.
+    """
+    transparent = Color(LIGHTNING_COLOR)
+    transparent[-1] = 0.0
+
+    halo = np.linspace(0, 1, halo_width, True)
+
+    gradient = Color.interpolate([transparent, LIGHTNING_COLOR], out_space="srgb")
+
+    image = Image.new("RGBA", og_image.size, (0, 0, 0, 0))
+    pen = ImageDraw.Draw(image)
+
+    for w, t in enumerate(halo):
+        pen.line(
+            line,
+            fill=get_rgba(gradient(t**2)),
+            width=1 + halo_width - w,
+            joint="curve",
+        )
+
+    pen.line(line, fill="white", width=2)
+
+    return image
+
+
+def create_branch(img, bolt, halo_width, branches=0):
+    """Generate and composite one branch bolt off an existing bolt path.
+
+    Picks a point along `bolt` (biased toward roughly a third of the
+    way down, via `RNG.triangular`) as the branch's origin, picks a
+    target for it with `pick_branch_target()`, generates the jagged
+    path between them with `displace_segment()`, and draws/composites
+    the result onto `img` via `draw_bolt()`.
+
+    Args:
+      img: The PIL RGBA Image to composite the branch onto, in place.
+      bolt: A list of [x, y] points describing the parent bolt (the
+        main lightning strike, or another branch) that this branch
+        forks off of.
+      halo_width: Width, in pixels, of the glowing halo drawn around
+        this branch; typically smaller than the main bolt's halo so
+        branches read as thinner/dimmer.
+      branches: Currently unused. Reserved for recursively spawning
+        sub-branches off of this branch.
+    """
+    frac = RNG.triangular(left=0, mode=1 / 3, right=1)
+    idx = int(frac * (len(bolt) - 1))
+    branch_point = bolt[idx]
+
+    branch_target = pick_branch_target(branch_point)
+    branch = [branch_point]
+    branch += displace_segment(branch_point, branch_target)
+
+    branch_image = draw_bolt(img, branch, halo_width)
+    img.alpha_composite(branch_image)
+
+
+def pick_branch_target(branch_point):
+    """Pick a branch's endpoint using the same triangular-sampling
+    convention as the main bolt's origin/target.
+
+    The y-coordinate is triangularly distributed between the branch
+    point and the bottom of the image (so branches tend to run about
+    halfway down but can occasionally reach further). The x-coordinate
+    is triangularly distributed between the branch point and whichever
+    edge of the image (left or right) lies on the opposite side of the
+    branch point from `LIGHTNING_TARGET`, so each branch tends to
+    diverge away from the direction the main bolt is headed.
+
+    Args:
+      branch_point: A 2-element [x, y] array/list, the point on the
+        main bolt (or a parent branch) where this branch originates.
+
+    Returns:
+      A 2-element numpy array [x, y] giving the branch's target point.
+    """
+    x, y = branch_point
+
+    branch_y = y + (HEIGHT - y) * RNG.random(2).mean()
+
+    if LIGHTNING_TARGET < x:
+        branch_x = x + (WIDTH - x) * RNG.random(2).mean()
+    else:
+        branch_x = x * RNG.random(2).mean()
+
+    return np.array([branch_x, branch_y])
 
 
 def rotate(v):
