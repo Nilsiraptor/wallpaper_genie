@@ -9,6 +9,7 @@ illusory shimmer/movement effect.
 
 from math import ceil
 
+from coloraide import Color
 from PIL import Image, ImageDraw
 
 
@@ -25,7 +26,7 @@ RADIUS = round(min(WIDTH, HEIGHT) / 200 * RADIUS_PERC)
 
 print(WIDTH, HEIGHT, RADIUS)
 
-THEME = "pool"
+THEME = "rebeccapurple"  # choose from 'original', 'pool' or a custom color
 
 BG_COLOR = "#ffffff"  # fallback background color (mostly covered by primroses)
 
@@ -38,7 +39,6 @@ PRIMROSE_B = "#000000"
 if THEME == "original":
     COLOR_A = "#4fbb80"  # dark squares
     COLOR_B = "#a0d733"  # light squares
-    BG_COLOR = "#ffffff"  # fallback background color (mostly covered by primroses)
 
     # Primrose (intersection marker) colors - these alternate at each grid vertex
     PRIMROSE_A = "#ffffff"
@@ -47,9 +47,29 @@ elif THEME == "pool":
     COLOR_A = "#01a0c0"  # dark squares
     COLOR_B = "#abe1fd"  # light squares
 else:
-    pass
-    # derive colors from hex code and make it lighter or darker using okLCH
-    # make diamonds/primroses white and black
+    # THEME is treated as a base hex color. Derive the dark/light checker
+    # squares by nudging its OkLCH lightness up and down while keeping the
+    # same chroma/hue, so any base color gets a natural-looking pair.
+    # The delta is tuned to roughly match the perceptual contrast between
+    # COLOR_A/COLOR_B in the "original" and "pool" themes above.
+    base = Color(THEME).convert("oklch")
+    base_l = base["lightness"]
+
+    # ~0.12 in OkLCH lightness mirrors the light/dark spread used by the
+    # "original" (#4fbb80 / #a0d733) and "pool" (#01a0c0 / #abe1fd) themes.
+    LIGHTNESS_DELTA = 0.12
+
+    if base_l < 0.5:
+        dark_l = base_l
+        light_l = base_l + LIGHTNESS_DELTA
+    else:
+        light_l = base_l
+        dark_l = base_l - LIGHTNESS_DELTA
+    dark = base.clone().set("lightness", dark_l)
+    light = base.clone().set("lightness", light_l)
+
+    COLOR_A = dark.convert("srgb").to_string(hex=True, fit=True)  # dark squares
+    COLOR_B = light.convert("srgb").to_string(hex=True, fit=True)  # light squares
 
 # Half-size (in px) of the diamond drawn at each intersection. Roughly matches
 # the corner cutout left behind by the rounded rectangles so the primroses
