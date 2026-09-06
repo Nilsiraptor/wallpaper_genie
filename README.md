@@ -1,10 +1,6 @@
 # Procedural Wallpaper Generators
 
-A small collection of standalone Python scripts that procedurally generate
-desktop wallpapers. Each script is self-contained, has a `CONFIG` section at
-the top with every tweakable parameter, and saves its output as a PNG named
-after the random seed used to generate it (so any image can be reproduced
-by reusing that seed).
+A small collection of standalone Python scripts that procedurally generate desktop wallpapers. Each script is self-contained, has a `CONFIG` section at the top with every tweakable parameter, and saves its output as a PNG named after the random seed used to generate it (so any image can be reproduced by reusing that seed).
 
 ## Requirements
 
@@ -34,10 +30,7 @@ python primroses_field.py
 
 ### `mountain_range_sunset.py`
 
-Draws a vertical sky gradient (pink/red at the bottom fading to yellow at
-the top) with several mountain silhouettes stacked in front of it,
-back-to-front, each one darker and larger than the last. Mountain ridgelines
-are built from 1D fractal (fBm) noise.
+Draws a vertical sky gradient (pink/red at the bottom fading to yellow at the top) with several mountain silhouettes stacked in front of it, back-to-front, each one darker and larger than the last. Mountain ridgelines are built from 1D fractal (fBm) noise.
 
 ![Mountain range sunset example](mountain_range_sunset.png)
 
@@ -58,9 +51,7 @@ are built from 1D fractal (fBm) noise.
 
 ### `thunder_storm.py`
 
-Builds a dark, banded storm-cloud backdrop, then composites a jagged lightning bolt (generated via fractal
-midpoint displacement) with a soft glowing halo and optional branches,
-breaking through the frontmost cloud bands.
+Builds a dark, banded storm-cloud backdrop, then composites a jagged lightning bolt (generated via fractal midpoint displacement) with a soft glowing halo and optional branches, breaking through the frontmost cloud bands.
 
 ![Thunder storm example](thunder_storm.png)
 
@@ -89,16 +80,9 @@ breaking through the frontmost cloud bands.
 
 ### `primroses_field.py`
 
-Recreates the shimmering, animated-looking checkerboard from Akiyoshi
-Kitaoka's *Primrose's Field*
-illusion: rounded two-tone squares whose corner gaps reveal small diamond
-"primroses" that alternate color at every grid intersection. The
-alternating high/low-contrast junctions between the squares and the
-primroses are what drive the illusory shimmer.
+Recreates the shimmering, animated-looking checkerboard from Akiyoshi Kitaoka's *Primrose's Field* illusion: rounded two-tone squares whose corner gaps reveal small diamond "primroses" that alternate color at every grid intersection. The alternating high/low-contrast junctions between the squares and the primroses are what drive the illusory shimmer.
 
-The grid cell size (75x98) intentionally matches the default Windows
-desktop icon grid spacing, so each icon lands centered in its own cell
-when used as a wallpaper.
+The grid cell size (75x98) intentionally matches the default Windows desktop icon grid spacing, so each icon lands centered in its own cell when used as a wallpaper.
 
 ![Primrose's field example](primroses_field.png)
 
