@@ -18,6 +18,7 @@ pip install -r requirements.txt
 |---|---|
 | [`mountain_range_sunset.py`](mountain_range_sunset.py) | A layered mountain range silhouette in front of a warm vertical sunset gradient. |
 | [`thunder_storm.py`](thunder_storm.py) | A dark, layered storm-cloud scene with a glowing, branching lightning bolt. |
+| [`primroses_field.py`](primroses_field.py) | A shimmering checkerboard illusion in the style of Kitaoka's "Primrose's Field". |
 
 More generators will be added to this repository over time.
 
@@ -26,6 +27,7 @@ Run a script directly to generate an image:
 ```bash
 python mountain_range_sunset.py
 python thunder_storm.py
+python primroses_field.py
 ```
 
 ---
@@ -82,3 +84,31 @@ breaking through the frontmost cloud bands.
 | `LIGHTNING_HALO_WIDTH` | Width (px) of the bolt's glowing halo. |
 | `LIGHTNING_ORIGIN` | x-coordinate at the top of the image where the bolt starts; `None` picks randomly. |
 | `LIGHTNING_TARGET` | x-coordinate at the bottom of the image where the bolt ends; `None` picks randomly, biased opposite `LIGHTNING_ORIGIN`. |
+
+---
+
+### `primroses_field.py`
+
+Recreates the shimmering, animated-looking checkerboard from Akiyoshi
+Kitaoka's *Primrose's Field*
+illusion: rounded two-tone squares whose corner gaps reveal small diamond
+"primroses" that alternate color at every grid intersection. The
+alternating high/low-contrast junctions between the squares and the
+primroses are what drive the illusory shimmer.
+
+The grid cell size (75x98) intentionally matches the default Windows
+desktop icon grid spacing, so each icon lands centered in its own cell
+when used as a wallpaper.
+
+![Primrose's field example](primroses_field.png)
+
+| Parameter | Description |
+|---|---|
+| `CANVAS_W`, `CANVAS_H` | Output image dimensions in pixels. |
+| `X_OFFSET`, `Y_OFFSET` | Pixel offset of the grid's origin, for nudging alignment. |
+| `WIDTH`, `HEIGHT` | Size of each grid cell in pixels; matches the Windows desktop icon grid by default. |
+| `RADIUS_PERC` | Corner radius of each square, as a percentage of the shorter cell dimension. |
+| `THEME` | `'original'` or `'pool'` for a preset palette, or any other color string to derive a palette from via OkLCH. |
+| `COLOR_A`, `COLOR_B` | The two checkerboard square colors (dark/light), set automatically from `THEME`. |
+| `PRIMROSE_A`, `PRIMROSE_B` | The two colors used for the diamond "primroses" at grid intersections. |
+| `PRIMROSE_HALF` | Half-size (px) of each primrose diamond. |
